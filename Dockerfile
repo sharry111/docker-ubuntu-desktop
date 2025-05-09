@@ -1,51 +1,36 @@
-# Start from an Ubuntu base
+# Base image
 FROM ubuntu:22.04
 
-# Disable interaction during install
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all required packages
-RUN apt-get update && apt-get install -y \
-    sudo curl wget gnupg2 unzip nano software-properties-common \
-    openjdk-17-jdk \
-    xfce4 xfce4-goodies tightvncserver \
-    xrdp firefox \
-    git net-tools
+# Install essentials
+RUN apt update && apt install -y \
+    sudo curl wget gnupg2 ca-certificates apt-transport-https software-properties-common \
+    xfce4 xfce4-goodies xrdp firefox \
+    dbus-x11 x11-utils x11-xserver-utils \
+    openjdk-17-jre-headless \
+    supervisor \
+    unzip git
 
-# Set up a user
-RUN useradd -m -s /bin/bash minecraft && \
-    echo 'minecraft ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Add user and set password
+RUN useradd -m -s /bin/bash paneluser && echo 'paneluser:panelpass' | chpasswd && adduser paneluser sudo
 
-USER minecraft
-WORKDIR /home/minecraft
+# Install PufferPanel (multi-user server panel)
+RUN curl https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash \
+    && apt install -y pufferpanel \
+    && pufferpanel user add --username sharrysidhu --email sharrysidhu@gmail.com --password 7789977899 --admin
 
-# Set up VNC password
-RUN mkdir -p ~/.vnc && \
-    echo "minecraft" | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd
+# Configure XRDP
+RUN echo xfce4-session > /home/paneluser/.xsession && \
+    chown paneluser:paneluser /home/paneluser/.xsession
 
-# Create VNC startup script
-RUN echo "#!/bin/bash\nstartxfce4 &" > ~/.vnc/xstartup && chmod +x ~/.vnc/xstartup
+# Supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Set up xRDP
-USER root
-RUN echo xfce4-session > /etc/skel/.Xsession && \
-    service xrdp start
+# Expose ports
+EXPOSE 3389   # XRDP (RDP access)
+EXPOSE 8080   # PufferPanel Web UI
 
-# Set custom RDP port (default is 3389)
-EXPOSE 3390
-RUN sed -i 's/3389/3390/' /etc/xrdp/xrdp.ini
-
-# Download and install PufferPanel (a lightweight, multi-user game panel)
-RUN curl -sSL https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
-    apt-get install -y pufferpanel && \
-    pufferpanel user add --username admin --email admin@example.com --password admin123 --name "Admin"
-
-# Enable and start services
-RUN systemctl enable xrdp && systemctl enable pufferpanel
-
-EXPOSE 8080 25565
-
-# Start all services
-CMD service xrdp start && \
-    service pufferpanel start && \
-    tail -f /dev/null
+# Startup
+CMD ["/usr/bin/supervisord"]
