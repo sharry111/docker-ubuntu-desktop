@@ -1,37 +1,45 @@
-# Dockerfile: RDP + Browser + Java (PaperMC 1.21.4) + Multi-user Panel (PufferPanel)
-
+# Base image
 FROM ubuntu:22.04
 
-# Avoid interactive prompts during build
+# Set environment variables to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install core utilities, desktop, RDP, and Java
+# Install system dependencies and Java for Minecraft
 RUN apt update && apt install -y \
-    sudo wget curl unzip gnupg \
-    software-properties-common net-tools nano supervisor lsb-release apt-transport-https ca-certificates \
-    xfce4 xrdp firefox openjdk-17-jre-headless
+    sudo \
+    wget \
+    curl \
+    unzip \
+    gnupg \
+    software-properties-common \
+    net-tools \
+    nano \
+    supervisor \
+    lsb-release \
+    apt-transport-https \
+    ca-certificates \
+    xfce4 \
+    xrdp \
+    firefox \
+    openjdk-17-jre-headless && \
+    apt clean && rm -rf /var/lib/apt/lists/*
 
-# Clean up
-RUN apt clean && rm -rf /var/lib/apt/lists/*
+# Set up RDP
+RUN adduser --disabled-password --gecos "" ubuntu && \
+    echo "ubuntu:ubuntu" | chpasswd && \
+    adduser ubuntu sudo && \
+    echo xfce4-session > /home/ubuntu/.xsession && \
+    chown ubuntu:ubuntu /home/ubuntu/.xsession && \
+    service xrdp start
 
-# Create a user (you can create more later)
-RUN useradd -m -s /bin/bash paneluser && echo 'paneluser:panelpass' | chpasswd && adduser paneluser sudo
-
-# Install PufferPanel
-RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash \
- && apt install -y pufferpanel \
- && systemctl enable pufferpanel
-
-# Configure XRDP
-RUN systemctl enable xrdp
-
-# RDP
+# Expose RDP port
 EXPOSE 3389
 
-# PufferPanel Web UI
-EXPOSE 8080
+# Set default user to ubuntu
+USER ubuntu
 
+# Set working directory
+WORKDIR /home/ubuntu
 
-# Start services using supervisord
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-CMD ["/usr/bin/supervisord"]
+# Start XRDP on container start
+CMD ["/usr/sbin/xrdp", "--nodaemon"]
