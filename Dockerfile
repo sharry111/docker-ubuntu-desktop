@@ -1,13 +1,10 @@
-# Base image
 FROM ubuntu:22.04
 
-# Set environment variables to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies and Java for Minecraft
+# Update and install required packages
 RUN apt update && apt install -y \
     sudo \
-    wget \
     curl \
     unzip \
     gnupg \
@@ -18,28 +15,22 @@ RUN apt update && apt install -y \
     lsb-release \
     apt-transport-https \
     ca-certificates \
-    xfce4 \
-    xrdp \
     firefox \
-    openjdk-17-jre-headless && \
+    openjdk-17-jre-headless \
+    xfce4 \
+    xrdp && \
     apt clean && rm -rf /var/lib/apt/lists/*
 
-# Set up RDP
-RUN adduser --disabled-password --gecos "" ubuntu && \
-    echo "ubuntu:ubuntu" | chpasswd && \
-    adduser ubuntu sudo && \
-    echo xfce4-session > /home/ubuntu/.xsession && \
-    chown ubuntu:ubuntu /home/ubuntu/.xsession && \
-    service xrdp start
+# Add default user with password
+RUN useradd -m ubuntu && echo "ubuntu:ubuntu" | chpasswd && adduser ubuntu sudo
+
+# Enable XRDP service
+RUN systemctl enable xrdp
+
+# Start supervisor to manage services
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose RDP port
 EXPOSE 3389
 
-# Set default user to ubuntu
-USER ubuntu
-
-# Set working directory
-WORKDIR /home/ubuntu
-
-# Start XRDP on container start
-CMD ["/usr/sbin/xrdp", "--nodaemon"]
+CMD ["/usr/bin/supervisord"]
