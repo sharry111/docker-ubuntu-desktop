@@ -1,35 +1,51 @@
-# Dockerfile: Base environment for Minecraft + Pterodactyl
+# Start from an Ubuntu base
 FROM ubuntu:22.04
 
+# Disable interaction during install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install base packages
-RUN apt update && apt install -y \
-  sudo apt-utils curl wget unzip zip gnupg2 software-properties-common \
-  openjdk-21-jre-headless git lsb-release net-tools nano \
-  systemd dbus iproute2 iputils-ping locales tzdata gnupg-agent \
-  ca-certificates lsof supervisor screen htop openssh-server \
-  && rm -rf /var/lib/apt/lists/*
+# Install all required packages
+RUN apt-get update && apt-get install -y \
+    sudo curl wget gnupg2 unzip nano software-properties-common \
+    openjdk-17-jdk \
+    xfce4 xfce4-goodies tightvncserver \
+    xrdp firefox \
+    git net-tools
 
-# Setup locale and timezone
-RUN locale-gen en_US.UTF-8 && update-locale LANG=en_US.UTF-8
-ENV LANG en_US.UTF-8
+# Set up a user
+RUN useradd -m -s /bin/bash minecraft && \
+    echo 'minecraft ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Set up Java environment
-ENV JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
-ENV PATH="$JAVA_HOME/bin:$PATH"
+USER minecraft
+WORKDIR /home/minecraft
 
-# Optional: install Docker inside Docker
-RUN curl -fsSL https://get.docker.com | sh
+# Set up VNC password
+RUN mkdir -p ~/.vnc && \
+    echo "minecraft" | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd
 
-# Optional: install Docker Compose
-RUN curl -L "https://github.com/docker/compose/releases/download/2.24.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
- && chmod +x /usr/local/bin/docker-compose
+# Create VNC startup script
+RUN echo "#!/bin/bash\nstartxfce4 &" > ~/.vnc/xstartup && chmod +x ~/.vnc/xstartup
 
-# Create user for panel/server (optional)
-RUN useradd -m -s /bin/bash mcserver
+# Set up xRDP
+USER root
+RUN echo xfce4-session > /etc/skel/.Xsession && \
+    service xrdp start
 
-# Default workdir
-WORKDIR /home/mcserver
+# Set custom RDP port (default is 3389)
+EXPOSE 3390
+RUN sed -i 's/3389/3390/' /etc/xrdp/xrdp.ini
 
-CMD [ "bash" ]
+# Download and install PufferPanel (a lightweight, multi-user game panel)
+RUN curl -sSL https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
+    apt-get install -y pufferpanel && \
+    pufferpanel user add --username admin --email admin@example.com --password admin123 --name "Admin"
+
+# Enable and start services
+RUN systemctl enable xrdp && systemctl enable pufferpanel
+
+EXPOSE 8080 25565
+
+# Start all services
+CMD service xrdp start && \
+    service pufferpanel start && \
+    tail -f /dev/null
