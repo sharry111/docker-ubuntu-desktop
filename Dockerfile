@@ -23,8 +23,11 @@ RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel
     systemctl enable pufferpanel
 
 # Expose necessary ports
-EXPOSE 3389   # RDP
-EXPOSE 8080   # PufferPanel
+# XRDP (RDP access)
+EXPOSE 3389
+
+# PufferPanel Web UI
+EXPOSE 8080
 
 # Start services
 CMD service dbus start && \
