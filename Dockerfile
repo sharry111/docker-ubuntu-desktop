@@ -2,35 +2,29 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and install required packages
+# Install necessary base packages, RDP, and sudo
 RUN apt update && apt install -y \
     sudo \
+    xrdp \
+    xfce4 \
+    xfce4-goodies \
+    dbus-x11 \
+    x11-xserver-utils \
+    net-tools \
+    wget \
     curl \
+    nano \
     unzip \
     gnupg \
-    software-properties-common \
-    net-tools \
-    nano \
-    supervisor \
-    lsb-release \
-    apt-transport-https \
-    ca-certificates \
-    firefox \
-    openjdk-17-jre-headless \
-    xfce4 \
-    xrdp && \
-    apt clean && rm -rf /var/lib/apt/lists/*
+    && apt clean && rm -rf /var/lib/apt/lists/*
 
-# Add default user with password
-RUN useradd -m ubuntu && echo "ubuntu:ubuntu" | chpasswd && adduser ubuntu sudo
+# Set up RDP
+RUN adduser --disabled-password --gecos "" user && \
+    echo "user:user" | chpasswd && \
+    adduser user sudo && \
+    echo xfce4-session > /home/user/.xsession && \
+    chown user:user /home/user/.xsession
 
-# Enable XRDP service
-RUN systemctl enable xrdp
-
-# Start supervisor to manage services
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Expose RDP port
 EXPOSE 3389
 
-CMD ["/usr/bin/supervisord"]
+CMD ["/usr/sbin/xrdp", "--nodaemon"]
