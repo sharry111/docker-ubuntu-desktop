@@ -1,36 +1,33 @@
-# Base image
 FROM ubuntu:22.04
 
-# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install essentials
-RUN apt update && apt install -y \
-    sudo curl wget gnupg2 ca-certificates apt-transport-https software-properties-common \
-    xfce4 xfce4-goodies xrdp firefox \
-    dbus-x11 x11-utils x11-xserver-utils \
-    openjdk-17-jre-headless \
-    supervisor \
-    unzip git
+RUN apt update && apt install -y sudo wget curl gnupg2 software-properties-common lsb-release \
+    xfce4 xfce4-goodies xorg dbus-x11 x11-utils firefox \
+    xrdp xterm net-tools locales openssl nano git unzip \
+    openjdk-17-jdk
 
-# Add user and set password
-RUN useradd -m -s /bin/bash paneluser && echo 'paneluser:panelpass' | chpasswd && adduser paneluser sudo
+# Configure locale
+RUN locale-gen en_US.UTF-8
 
-# Install PufferPanel (multi-user server panel)
-RUN curl https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash \
-    && apt install -y pufferpanel \
-    && pufferpanel user add --username sharrysidhu --email sharrysidhu@gmail.com --password 7789977899 --admin
+# Add user with sudo access
+RUN useradd -m -s /bin/bash user && echo "user:user" | chpasswd && adduser user sudo
 
-# Configure XRDP
-RUN echo xfce4-session > /home/paneluser/.xsession && \
-    chown paneluser:paneluser /home/paneluser/.xsession
+# Setup RDP
+RUN systemctl enable xrdp && echo "xfce4-session" > /home/user/.xsession && chown user:user /home/user/.xsession
 
-# Supervisor config
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Install PufferPanel
+RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
+    apt install -y pufferpanel && \
+    systemctl enable pufferpanel
 
-# Expose ports
-EXPOSE 3389   # XRDP (RDP access)
-EXPOSE 8080   # PufferPanel Web UI
+# Expose necessary ports
+EXPOSE 3389   # RDP
+EXPOSE 8080   # PufferPanel
 
-# Startup
-CMD ["/usr/bin/supervisord"]
+# Start services
+CMD service dbus start && \
+    service xrdp start && \
+    service pufferpanel start && \
+    tail -f /dev/null
