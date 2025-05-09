@@ -1,36 +1,49 @@
+# Base image with Ubuntu and essential tools
 FROM ubuntu:22.04
 
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install essentials
-RUN apt update && apt install -y sudo wget curl gnupg2 software-properties-common lsb-release \
-    xfce4 xfce4-goodies xorg dbus-x11 x11-utils firefox \
-    xrdp xterm net-tools locales openssl nano git unzip \
-    openjdk-17-jdk
+# Update and install dependencies
+RUN apt update && apt install -y \
+    sudo \
+    wget \
+    curl \
+    unzip \
+    gnupg \
+    software-properties-common \
+    openjdk-17-jre-headless \
+    xfce4 \
+    xrdp \
+    firefox \
+    nano \
+    git \
+    net-tools \
+    supervisor \
+    lsb-release \
+    apt-transport-https \
+    ca-certificates && \
+    apt clean && rm -rf /var/lib/apt/lists/*
 
-# Configure locale
-RUN locale-gen en_US.UTF-8
+# Create a user
+RUN useradd -m -s /bin/bash minecraft && echo 'minecraft:minecraft' | chpasswd && adduser minecraft sudo
 
-# Add user with sudo access
-RUN useradd -m -s /bin/bash user && echo "user:user" | chpasswd && adduser user sudo
-
-# Setup RDP
-RUN systemctl enable xrdp && echo "xfce4-session" > /home/user/.xsession && chown user:user /home/user/.xsession
-
-# Install PufferPanel
-RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
-    apt install -y pufferpanel && \
-    systemctl enable pufferpanel
-
-# Expose necessary ports
-# XRDP (RDP access)
+# Expose RDP port
 EXPOSE 3389
 
 # PufferPanel Web UI
 EXPOSE 8080
 
-# Start services
-CMD service dbus start && \
-    service xrdp start && \
-    service pufferpanel start && \
-    tail -f /dev/null
+# Install PufferPanel
+RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
+    apt install -y pufferpanel && \
+    pufferpanel user add --username admin --email admin@example.com --password admin123 --name "Admin"
+
+# Enable PufferPanel on boot
+RUN systemctl enable pufferpanel || true
+
+# Copy supervisord config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Start services via supervisord
+CMD ["/usr/bin/supervisord"]
