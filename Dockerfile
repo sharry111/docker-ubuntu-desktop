@@ -1,41 +1,34 @@
-# Base image with Ubuntu and essential tools
+# Dockerfile: RDP + Browser + Java (PaperMC 1.21.4) + Multi-user Panel (PufferPanel)
+
 FROM ubuntu:22.04
 
-# Set environment variables
+# Avoid interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install basic tools
+# Install core utilities, desktop, RDP, and Java
 RUN apt update && apt install -y \
-  sudo wget curl unzip gnupg software-properties-common net-tools nano supervisor lsb-release apt-transport-https ca-certificates
-
-# Install Java 17 for PaperMC
-RUN apt install -y openjdk-17-jre-headless
-
-# Install XFCE desktop and XRDP
-RUN apt install -y xfce4 xrdp firefox
+    sudo wget curl unzip gnupg \
+    software-properties-common net-tools nano supervisor lsb-release apt-transport-https ca-certificates \
+    xfce4 xrdp firefox openjdk-17-jre-headless
 
 # Clean up
 RUN apt clean && rm -rf /var/lib/apt/lists/*
 
-# Create a user
-RUN useradd -m -s /bin/bash minecraft && echo 'minecraft:minecraft' | chpasswd && adduser minecraft sudo
-
-# Expose RDP port
-EXPOSE 3389
-
-# PufferPanel Web UI
-EXPOSE 8080
+# Create a user (you can create more later)
+RUN useradd -m -s /bin/bash paneluser && echo 'paneluser:panelpass' | chpasswd && adduser paneluser sudo
 
 # Install PufferPanel
-RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash && \
-    apt install -y pufferpanel && \
-    pufferpanel user add --username admin --email admin@example.com --password admin123 --name "Admin"
+RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh | bash \
+ && apt install -y pufferpanel \
+ && systemctl enable pufferpanel
 
-# Enable PufferPanel on boot
-RUN systemctl enable pufferpanel || true
+# Configure XRDP
+RUN systemctl enable xrdp
 
-# Copy supervisord config
+# Open ports
+EXPOSE 3389    # RDP
+EXPOSE 8080    # PufferPanel Web UI
+
+# Start services using supervisord
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Start services via supervisord
 CMD ["/usr/bin/supervisord"]
