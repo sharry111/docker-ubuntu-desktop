@@ -25,9 +25,12 @@ RUN curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel
 # Configure XRDP
 RUN systemctl enable xrdp
 
-# Open ports
-EXPOSE 3389    # RDP
-EXPOSE 8080    # PufferPanel Web UI
+# RDP
+EXPOSE 3389
+
+# PufferPanel Web UI
+EXPOSE 8080
+
 
 # Start services using supervisord
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
