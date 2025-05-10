@@ -1,28 +1,26 @@
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and install core packages
-RUN apt update -y && apt install --no-install-recommends -y \
+# Install XFCE, VNC server, noVNC, and Firefox
+RUN apt update && apt install -y \
     xfce4 xfce4-goodies \
     tigervnc-standalone-server \
     novnc websockify \
-    sudo xterm init systemd snapd \
-    vim net-tools curl wget git tzdata \
-    dbus-x11 x11-utils x11-xserver-utils x11-apps \
-    firefox xubuntu-icon-theme && \
-    apt clean
+    firefox curl wget sudo net-tools \
+    && apt clean
 
-# Ensure Xauthority exists
-RUN touch /root/.Xauthority
+# Create a user
+RUN useradd -m -s /bin/bash user && echo 'user:user' | chpasswd && adduser user sudo
 
-# Expose ports for VNC and noVNC
-EXPOSE 5901
+# Setup VNC password
+RUN mkdir -p /home/user/.vnc && \
+    echo "password" | vncpasswd -f > /home/user/.vnc/passwd && \
+    chown -R user:user /home/user/.vnc && \
+    chmod 600 /home/user/.vnc/passwd
+
+# Start VNC with XFCE on display :1 and launch websockify for noVNC access on port 6080
 EXPOSE 6080
-
-# Start VNC server and websockify
-CMD bash -c "\
-    vncserver -localhost no -SecurityTypes None -geometry 1024x768 --I-KNOW-THIS-IS-INSECURE && \
-    openssl req -new -subj '/C=JP' -x509 -days 365 -nodes -out self.pem -keyout self.pem && \
-    websockify -D --web=/usr/share/novnc/ --cert=self.pem 6080 localhost:5901 && \
-    tail -f /dev/null"
+CMD bash -c "vncserver :1 -geometry 1280x800 -SecurityTypes None && \
+             websockify --web=/usr/share/novnc/ 6080 localhost:5901 && \
+             tail -f /dev/null"
