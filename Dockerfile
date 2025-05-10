@@ -16,5 +16,5 @@ EXPOSE 6080
 
 # Start script to launch desktop in browser
 CMD bash -c "\
-    vncserver -localhost no -SecurityTypes None -geometry 1280x720 :1 && \
+    vncserver :1 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE -geometry 1280x720 && \
     websockify --web=/usr/share/novnc/ --cert=/etc/ssl/certs/ssl-cert-snakeoil.pem 6080 localhost:5901"
