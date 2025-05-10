@@ -2,30 +2,27 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install XFCE, RDP, Chromium, and some utilities
-RUN apt update && apt install -y \
-    xrdp \
-    xfce4 \
-    xfce4-goodies \
+# Basic setup
+RUN apt-get update && apt-get install -y \
+    sudo apt-utils software-properties-common \
+    xrdp xfce4 xfce4-goodies \
     chromium-browser \
-    dbus-x11 \
-    sudo \
-    wget \
-    curl \
-    net-tools \
-    && apt clean
+    dbus-x11 x11-xserver-utils x11-utils x11-apps \
+    net-tools curl wget git nano unzip gnupg \
+    && apt-get clean
 
-# Set up xrdp to use XFCE
-RUN echo "xfce4-session" > /etc/skel/.xsession && \
-    mkdir -p /root/.config && \
-    echo "exec startxfce4" > /root/.xsession && \
-    echo "startxfce4" > /root/.xinitrc && \
-    adduser xrdp ssl-cert
+# Create default user
+RUN useradd -m -s /bin/bash user && echo "user:user" | chpasswd && adduser user sudo
 
-# Fix color depth issue
-RUN sed -i 's/3389/3389/g' /etc/xrdp/xrdp.ini && \
-    sed -i 's/^new_cursors=true/new_cursors=false/' /etc/xrdp/xrdp.ini
+# Configure xrdp
+RUN echo "xfce4-session" > /home/user/.xsession && \
+    chown user:user /home/user/.xsession && \
+    sed -i 's/console/anybody/' /etc/X11/Xwrapper.config && \
+    systemctl enable xrdp
 
-# Enable xrdp service
-EXPOSE 3389
+# Set custom RDP port (6080)
+RUN sed -i 's/3389/6080/g' /etc/xrdp/xrdp.ini
+
+EXPOSE 6080
+
 CMD ["/usr/sbin/xrdp", "--nodaemon"]
