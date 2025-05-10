@@ -1,38 +1,32 @@
-
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install XFCE, noVNC, websockify, and Chromium
+# Install dependencies
 RUN apt update && apt install -y \
-    xfce4 \
-    xfce4-goodies \
-    tigervnc-standalone-server \
-    novnc \
-    websockify \
-    sudo \
-    xterm \
-    net-tools \
-    curl \
-    wget \
-    git \
-    vim \
-    chromium-browser \
-    x11-utils \
-    x11-xserver-utils \
-    x11-apps \
-    dbus-x11 \
-    tzdata
+  xfce4 xfce4-goodies \
+  x11-xserver-utils dbus-x11 xterm \
+  tigervnc-standalone-server \
+  novnc websockify \
+  chromium-browser \
+  sudo wget curl git vim net-tools apt-utils
 
-# Fix VNC insecure error and setup
+# Create a VNC startup script
 RUN mkdir -p ~/.vnc && \
-    echo '#!/bin/bash\nstartxfce4 &' > ~/.vnc/xstartup && \
-    chmod +x ~/.vnc/xstartup && \
-    touch /root/.Xauthority
+    echo '#!/bin/bash\n\
+xrdb $HOME/.Xresources\n\
+startxfce4 &' > ~/.vnc/xstartup && \
+    chmod +x ~/.vnc/xstartup
 
+# Fix permission issues
+RUN mkdir -p /root/.vnc && touch /root/.Xauthority
+
+# Expose ports
 EXPOSE 6080
 
-CMD bash -c "vncserver :1 -localhost no -SecurityTypes None -geometry 1280x720 --I-KNOW-THIS-IS-INSECURE && \
-    openssl req -new -subj '/C=JP' -x509 -days 365 -nodes -out self.pem -keyout self.pem && \
-    websockify -D --web=/usr/share/novnc/ --cert=self.pem 6080 localhost:5901 && \
-    tail -f /dev/null"
+# Startup command
+CMD bash -c "\
+vncserver :1 -localhost no -SecurityTypes None -geometry 1280x800 -xstartup /root/.vnc/xstartup --I-KNOW-THIS-IS-INSECURE && \
+openssl req -new -subj '/CN=localhost' -x509 -days 365 -nodes -out /root/self.pem -keyout /root/self.pem && \
+websockify --web=/usr/share/novnc/ --cert=/root/self.pem 6080 localhost:5901 & \
+tail -f /dev/null"
