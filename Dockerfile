@@ -2,26 +2,34 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
+# Install system dependencies
 RUN apt update && apt install -y \
     xfce4 xfce4-goodies \
-    chromium-browser \
+    xterm \
     tigervnc-standalone-server \
+    novnc \
+    websockify \
     supervisor \
-    wget curl net-tools \
-    xterm dbus-x11 \
-    novnc websockify \
-    && apt clean
+    sudo \
+    apt-utils \
+    wget curl git net-tools nano \
+    chromium-browser
 
-# Create VNC password (no authentication)
-RUN mkdir -p ~/.vnc && \
-    echo "" | vncpasswd -f > ~/.vnc/passwd && \
-    chmod 600 ~/.vnc/passwd
+# Set up VNC
+RUN mkdir -p ~/.vnc \
+ && echo '#!/bin/sh\nstartxfce4 &' > ~/.vnc/xstartup \
+ && chmod +x ~/.vnc/xstartup
 
-# Setup supervisor config for VNC and noVNC
+# Create self-signed cert for noVNC
+RUN mkdir -p /etc/ssl/novnc \
+ && openssl req -new -x509 -days 365 -nodes \
+    -out /etc/ssl/novnc/self.pem -keyout /etc/ssl/novnc/self.pem \
+    -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost"
+
+# Supervisor config
+RUN mkdir -p /etc/supervisor/conf.d
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Expose the noVNC port
 EXPOSE 6080
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+CMD ["/usr/bin/supervisord", "-n"]
