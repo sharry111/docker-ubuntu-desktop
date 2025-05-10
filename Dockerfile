@@ -2,37 +2,35 @@ FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Base desktop + VNC + noVNC
-RUN apt update && apt install --no-install-recommends -y \
+# Install XFCE desktop, VNC, noVNC, RDP basics
+RUN apt update && apt install -y --no-install-recommends \
     xfce4 xfce4-goodies \
     tigervnc-standalone-server \
     novnc websockify \
-    sudo xterm net-tools curl wget git \
-    vim dbus-x11 x11-utils x11-xserver-utils x11-apps \
-    software-properties-common tzdata xubuntu-icon-theme
+    xterm net-tools sudo curl wget git vim \
+    dbus-x11 x11-utils x11-xserver-utils x11-apps \
+    software-properties-common
 
-# Remove snap-based Firefox and install real Firefox (deb version)
-RUN snap remove firefox || true && \
-    apt purge -y firefox && \
+# Clean any snap-based Firefox, install .deb Firefox from PPA
+RUN if command -v snap >/dev/null 2>&1; then snap remove firefox || true; fi && \
+    apt purge -y firefox snapd && \
     rm -rf /home/*/.mozilla /root/.mozilla && \
     add-apt-repository -y ppa:mozillateam/ppa && \
+    echo 'Package: *\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001' > /etc/apt/preferences.d/mozillateam && \
+    echo 'Unattended-Upgrade::Allowed-Origins { "LP-PPA-mozillateam:jammy"; };' > /etc/apt/apt.conf.d/51unattended-upgrades-firefox && \
     apt update && apt install -y firefox && \
     update-alternatives --set x-www-browser /usr/bin/firefox && \
     update-alternatives --set gnome-www-browser /usr/bin/firefox
 
-# Setup VNC and noVNC
+# Set up noVNC and expose browser-based desktop over port 6080
 RUN mkdir -p ~/.vnc && \
-    echo "#!/bin/bash\nstartxfce4 &" > ~/.vnc/xstartup && \
+    echo '#!/bin/bash\nstartxfce4 &' > ~/.vnc/xstartup && \
     chmod +x ~/.vnc/xstartup && \
     touch /root/.Xauthority
 
-# Expose VNC and noVNC ports
-EXPOSE 5901
 EXPOSE 6080
 
-# Start VNC server + noVNC
 CMD bash -c "\
-    vncserver :1 -geometry 1280x720 -SecurityTypes None --I-KNOW-THIS-IS-INSECURE && \
-    openssl req -new -subj \"/C=JP\" -x509 -days 365 -nodes -out /root/self.pem -keyout /root/self.pem && \
-    websockify --web=/usr/share/novnc/ --cert=/root/self.pem 6080 localhost:5901 & \
+    vncserver :1 -localhost no -SecurityTypes None -geometry 1280x800 --I-KNOW-THIS-IS-INSECURE && \
+    websockify -D --web=/usr/share/novnc/ --cert=/etc/ssl/certs/ssl-cert-snakeoil.pem 6080 localhost:5901 && \
     tail -f /dev/null"
