@@ -2,34 +2,37 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install essentials
 RUN apt update && apt install -y \
-    xfce4 xfce4-goodies \
-    xterm \
-    tigervnc-standalone-server \
-    novnc \
-    websockify \
     supervisor \
-    sudo \
-    apt-utils \
-    wget curl git net-tools nano \
-    chromium-browser
+    xfce4 xfce4-goodies \
+    tigervnc-standalone-server \
+    novnc websockify \
+    chromium-browser \
+    python3-pip \
+    sudo wget curl \
+    && apt clean && rm -rf /var/lib/apt/lists/*
 
-# Set up VNC
-RUN mkdir -p ~/.vnc \
- && echo '#!/bin/sh\nstartxfce4 &' > ~/.vnc/xstartup \
- && chmod +x ~/.vnc/xstartup
+# Create VNC user
+RUN useradd -m -s /bin/bash vncuser && echo "vncuser:vncuser" | chpasswd && adduser vncuser sudo
 
-# Create self-signed cert for noVNC
-RUN mkdir -p /etc/ssl/novnc \
- && openssl req -new -x509 -days 365 -nodes \
-    -out /etc/ssl/novnc/self.pem -keyout /etc/ssl/novnc/self.pem \
+# Setup supervisord
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Create noVNC self-signed cert
+RUN mkdir -p /etc/ssl/novnc && \
+    openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout /etc/ssl/novnc/self.pem \
+    -out /etc/ssl/novnc/self.pem \
+    -days 365 \
     -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost"
 
-# Supervisor config
-RUN mkdir -p /etc/supervisor/conf.d
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Setup VNC password (no auth)
+RUN mkdir -p /home/vncuser/.vnc && \
+    echo -n > /home/vncuser/.vnc/passwd && \
+    chmod 600 /home/vncuser/.vnc/passwd && \
+    chown -R vncuser:vncuser /home/vncuser/.vnc
 
 EXPOSE 6080
 
-CMD ["/usr/bin/supervisord", "-n"]
+CMD ["/usr/bin/supervisord"]
